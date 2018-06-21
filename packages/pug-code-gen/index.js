@@ -517,16 +517,26 @@ Compiler.prototype = {
    * @param {boolean} interpolated
    * @api public
    */
-
-  visitTag: function(tag, interpolated){
+  
+  visitTag: function(tag /*interpolated*/){
     this.indents++;
+    if (! this.options.kitTagModels[tag.name]) {
+      return this.indents--
+    }
     var name = tag.name
       , pp = this.pp
-      , self = this;
-
+      , self = this
+      , render = self.options.kitTagModels[tag.name].render
+      , renderBefore = self.options.kitTagModels[tag.name].renderBefore
+      , renderAfter = self.options.kitTagModels[tag.name].renderAfter;
     function bufferName() {
-      if (interpolated) self.bufferExpression(tag.expr);
-      else self.buffer(name);
+      // if (interpolated) self.bufferExpression(tag.expr);
+      if (renderBefore) {
+        self.buffer(renderBefore(tag.attrs))
+      } else {
+        self.buffer(render(tag.attrs))
+      }
+      
     }
 
     if (WHITE_SPACE_SENSITIVE_TAGS[tag.name] === true) this.escapePrettyMode = true;
@@ -537,45 +547,51 @@ Compiler.prototype = {
       }
       this.hasCompiledTag = true;
     }
-
-    // pretty print
+    // this.prettyIndent(0, true)
+    bufferName()
+    
+    //pretty print
     if (pp && !tag.isInline)
       this.prettyIndent(0, true);
-    if (tag.selfClosing || (!this.xml && selfClosing[tag.name])) {
-      this.buffer('<');
-      bufferName();
-      this.visitAttributes(tag.attrs, this.attributeBlocks(tag.attributeBlocks));
-      if (this.terse && !tag.selfClosing) {
-        this.buffer('>');
-      } else {
-        this.buffer('/>');
-      }
-      // if it is non-empty throw an error
-      if (tag.code ||
-          tag.block &&
-          !(tag.block.type === 'Block' && tag.block.nodes.length === 0) &&
-          tag.block.nodes.some(function (tag) {
-            return tag.type !== 'Text' || !/^\s*$/.test(tag.val)
-          })) {
-        this.error(name + ' is a self closing element: <'+name+'/> but contains nested content.', 'SELF_CLOSING_CONTENT', tag);
-      }
-    } else {
+    // if (tag.selfClosing || (!this.xml && selfClosing[tag.name])) {
+    //   this.buffer('<');
+    //   bufferName();
+    //   this.visitAttributes(tag.attrs, this.attributeBlocks(tag.attributeBlocks));
+    //   if (this.terse && !tag.selfClosing) {
+    //     this.buffer('>');
+    //   } else {
+    //     this.buffer('/>');
+    //   }
+    //   // if it is non-empty throw an error
+    //   if (tag.code ||
+    //       tag.block &&
+    //       !(tag.block.type === 'Block' && tag.block.nodes.length === 0) &&
+    //       tag.block.nodes.some(function (tag) {
+    //         return tag.type !== 'Text' || !/^\s*$/.test(tag.val)
+    //       })) {
+    //     this.error(name + ' is a self closing element: <'+name+'/> but contains nested content.', 'SELF_CLOSING_CONTENT', tag);
+    //   }
+    // } else {
       // Optimize attributes buffering
-      this.buffer('<');
-      bufferName();
-      this.visitAttributes(tag.attrs, this.attributeBlocks(tag.attributeBlocks));
-      this.buffer('>');
+      // this.buffer('<');
+      // bufferName();
+      // this.visitAttributes(tag.attrs, this.attributeBlocks(tag.attributeBlocks));
+      // this.buffer('>');
       if (tag.code) this.visitCode(tag.code);
       this.visit(tag.block, tag);
-
+      
       // pretty print
       if (pp && !tag.isInline && WHITE_SPACE_SENSITIVE_TAGS[tag.name] !== true && !tagCanInline(tag))
         this.prettyIndent(0, true);
-
-      this.buffer('</');
-      bufferName();
-      this.buffer('>');
-    }
+      //закрытие тега
+      if (renderAfter) {
+        this.buffer(renderAfter(tag.attrs))
+      }
+      
+      // this.buffer('</');
+      // bufferName();
+      // this.buffer('>');
+    // }
 
     if (WHITE_SPACE_SENSITIVE_TAGS[tag.name] === true) this.escapePrettyMode = false;
 
